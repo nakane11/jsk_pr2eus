@@ -1520,6 +1520,7 @@ Return value is a list of interpolatingp for all controllers, so (null (some #'i
   (:move-to-wait
    (&rest args &key (retry 10) (frame-id "world") (correction t)
           (wait-for-result-duration-time 1.0) (tolerance 0.0) &allow-other-keys)
+   (when (> tolerance 0.0) (setq correction nil))
    (let (ret (count 0) (tm (ros::time-now))
 	     (map-to-frame move-base-goal-map-to-frame)
              (coords move-base-goal-coords))
@@ -1552,21 +1553,22 @@ Return value is a list of interpolatingp for all controllers, so (null (some #'i
                 (not (eq (send move-base-action :get-state) actionlib_msgs::GoalStatus::*preempted*)))
          (ros::spin-once)
          (send move-base-action :wait-for-result
-               :timeout wait-for-result-duration-time))
+               :timeout wait-for-result-duration-time)
+         (if (> tolerance 0.0)
+             (progn
+               (setq base-goal-coords
+                     (send (send *tfl* :lookup-transform base-frame-id frame-id (ros::time 0))
+                           :transform (send coords :copy-worldcoords))) ;; goal-coords in base coordinates
+               (setq goal-pos (send base-goal-coords :pos))
+               (setq distance (/ (norm (float-vector (elt goal-pos 0) (elt goal-pos 1))) 1000))
+               (ros::ros-info (format nil "distance: ~A" distance))
+               (when (< distance tolerance)
+                 (setq ret t)
+                 (return))
+           ))
        (ros::ros-info (format nil "(send move-base-action :get-state) ~A"  (send move-base-action :get-state)))
-       (if (> tolerance 0.0)
-           (progn
-             (setq base-goal-coords
-                   (send (send *tfl* :lookup-transform base-frame-id frame-id (ros::time 0))
-                         :transform (send coords :copy-worldcoords))) ;; goal-coords in base coordinates
-             (setq goal-pos (send base-goal-coords :pos))
-             (setq distance (/ (norm (float-vector (elt goal-pos 0) (elt goal-pos 1))) 1000))
-             (ros::ros-info (format nil "distance: ~A" distance))
-             (when (< distance tolerance)
-                 (setq ret t)))
-           (if (eq (send move-base-action :get-state) actionlib_msgs::GoalStatus::*succeeded*)
-               (setq ret t))
-           )
+       (if (eq (send move-base-action :get-state) actionlib_msgs::GoalStatus::*succeeded*)
+           (setq ret t))
        (incf count))
      (ros::ros-info "move-to : ~A" (if ret 'succeeded 'failed))
      ;;
@@ -1637,7 +1639,7 @@ Return value is a list of interpolatingp for all controllers, so (null (some #'i
            ) ;;  (do (i 2)
          ))
      (setq move-base-goal-msg nil) ;; :move-to-wait has been called
-     ret))
+     ret)))
 
   (:go-waitp
    ()
