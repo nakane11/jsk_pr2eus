@@ -1554,18 +1554,20 @@ Return value is a list of interpolatingp for all controllers, so (null (some #'i
          (ros::spin-once)
          (send move-base-action :wait-for-result
                :timeout wait-for-result-duration-time)
-         (if (> tolerance 0.0)
-             (progn
-               (setq base-goal-coords
-                     (send (send *tfl* :lookup-transform base-frame-id frame-id (ros::time 0))
-                           :transform (send coords :copy-worldcoords))) ;; goal-coords in base coordinates
-               (setq goal-pos (send base-goal-coords :pos))
-               (setq distance (/ (norm (float-vector (elt goal-pos 0) (elt goal-pos 1))) 1000))
-               (ros::ros-info (format nil "distance: ~A" distance))
-               (when (< distance tolerance)
-                 (setq ret t)
-                 (return))
-           ))
+         (when (> tolerance 0.0)
+           (setq base-goal-coords
+                 (send (send *tfl* :lookup-transform base-frame-id frame-id (ros::time 0))
+                       :transform (send coords :copy-worldcoords))) ;; goal-coords in base coordinates
+           (setq goal-pos (send base-goal-coords :pos))
+           (setq distance (/ (norm (float-vector (elt goal-pos 0) (elt goal-pos 1))) 1000))
+           (ros::ros-info (format nil "distance: ~A" distance))
+           (when (< distance tolerance)
+             (setq ret t)
+             (return)
+             )
+           )
+         )
+
        (ros::ros-info (format nil "(send move-base-action :get-state) ~A"  (send move-base-action :get-state)))
        (if (eq (send move-base-action :get-state) actionlib_msgs::GoalStatus::*succeeded*)
            (setq ret t))
@@ -1609,12 +1611,12 @@ Return value is a list of interpolatingp for all controllers, so (null (some #'i
                  )
              (progn
                (ros::ros-error "too far from goal position ~A mm (> 200mm)" diff-len)
-	       ;; move-to succeeded but away from 200 mm
-	       (ros::ros-error ":move-to try to send /move_base_simple/goal")
-	       (ros::advertise "/move_base_simple/goal" geometry_msgs::PoseStamped 1)
-	       (send move-base-goal-msg :goal :target_pose :header :seq (1+ count))
-	       (ros::publish "/move_base_simple/goal" (send move-base-goal-msg :goal :target_pose))
-	       (unix:sleep 3)
+               ;; move-to succeeded but away from 200 mm
+               (ros::ros-error ":move-to try to send /move_base_simple/goal")
+               (ros::advertise "/move_base_simple/goal" geometry_msgs::PoseStamped 1)
+               (send move-base-goal-msg :goal :target_pose :header :seq (1+ count))
+               (ros::publish "/move_base_simple/goal" (send move-base-goal-msg :goal :target_pose))
+               (unix:sleep 3)
                (setq move-base-goal-msg nil)
                (return-from :move-to-wait nil)
                ))
@@ -1639,7 +1641,7 @@ Return value is a list of interpolatingp for all controllers, so (null (some #'i
            ) ;;  (do (i 2)
          ))
      (setq move-base-goal-msg nil) ;; :move-to-wait has been called
-     ret)))
+     ret))
 
   (:go-waitp
    ()
