@@ -1811,7 +1811,7 @@ Return value is a list of interpolatingp for all controllers, so (null (some #'i
      t))
   ;;
   (:move-trajectory-sequence
-   (trajectory-points time-list &key (stop t) (start-time) (send-action nil))
+   (trajectory-points time-list &key (stop t) (start-time) (send-action nil) (wait t))
    "Move base following the trajectory points at each time points
     trajectory-points [ list of #f(x y d) ([m] for x, y; [rad] for d) ]
     time-list [list of time span [msec] ]
@@ -1898,10 +1898,11 @@ Return value is a list of interpolatingp for all controllers, so (null (some #'i
            (ros::ros-error "send-action is t, but move-base-trajectory-action is not found")
            (return-from :move-trajectory-sequence nil))
          (send move-base-trajectory-action :send-goal goal)
-         (if (send move-base-trajectory-action :wait-for-result)
-             (return-from :move-trajectory-sequence
-               (send move-base-trajectory-action :get-result))
-             (return-from :move-trajectory-sequence nil)))
+         (when wait
+           (if (send move-base-trajectory-action :wait-for-result)
+               (return-from :move-trajectory-sequence
+                 (send move-base-trajectory-action :get-result))
+               (return-from :move-trajectory-sequence nil))))
        goal)))
   ;;
   (:move-trajectory
